@@ -724,48 +724,59 @@
   function saveAllCards() {
     document.getElementById('menuDropdown').classList.remove('open');
 
-    var promises = [];
-    for (var i = 0; i < TOTAL; i++) {
-      (function(idx) {
-        var cardNum = idx < 9 ? '0' + (idx+1) : '10';
-        var el = document.getElementById('card-' + cardNum);
-        if (el) {
-          var promise = htmlToImage.toPng(el).then(function(dataUrl) {
-            return {
-              name: 'Card_' + cardNum + '.png',
-              dataUrl: dataUrl
-            };
-          }).catch(function(err) {
-            console.error('Card ' + cardNum + ' 저장 실패:', err);
-            return null;
-          });
-          promises.push(promise);
-        }
-      })(i);
+    var savedCount = 0;
+    var totalCount = TOTAL;
+
+    function downloadCard(idx) {
+      if (idx >= totalCount) {
+        console.log('모든 카드 저장 완료');
+        alert('10장의 이미지가 다운로드되었습니다.');
+        return;
+      }
+
+      var cardNum = idx < 9 ? '0' + (idx + 1) : '10';
+      var cardEl = document.getElementById('card-' + cardNum);
+
+      if (!cardEl) {
+        console.log('Card ' + cardNum + ' 요소를 찾을 수 없습니다.');
+        downloadCard(idx + 1);
+        return;
+      }
+
+      var canvasEl = cardEl.querySelector('.c-canvas');
+      if (!canvasEl) {
+        console.log('Canvas 요소를 찾을 수 없습니다: card-' + cardNum);
+        downloadCard(idx + 1);
+        return;
+      }
+
+      htmlToImage.toPng(canvasEl, {
+        width: 1080,
+        height: 1350,
+        pixelRatio: 2,
+        cacheBust: true
+      }).then(function(dataUrl) {
+        var link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = 'Card_' + cardNum + '.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        savedCount++;
+        console.log('저장됨: Card ' + cardNum + ' (' + savedCount + '/' + totalCount + ')');
+
+        // 0.5초 후 다음 카드 저장
+        setTimeout(function() {
+          downloadCard(idx + 1);
+        }, 500);
+      }).catch(function(err) {
+        console.error('Card ' + cardNum + ' 저장 실패:', err);
+        downloadCard(idx + 1);
+      });
     }
 
-    Promise.all(promises).then(function(results) {
-      var zip = new JSZip();
-      results.forEach(function(result) {
-        if (result) {
-          var base64 = result.dataUrl.split(',')[1];
-          zip.file(result.name, base64, {base64: true});
-        }
-      });
-      return zip.generateAsync({type:'blob'});
-    }).then(function(blob) {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'Google_Daily_Brief_Cards.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }).catch(function(err) {
-      console.error('저장 실패:', err);
-      alert('이미지 저장 중 오류가 발생했습니다.');
-    });
+    downloadCard(0);
   }
 
   /* ── CAROUSEL ── */
