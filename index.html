@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Daily Brief 한국 현실 검증 | 카드뉴스</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root,
+    html.theme-dark {
+      --bg: #0A0A0A;
+      --surface: #141414;
+      --surface-2: #1e1e1e;
+      --text: #EDEDED;
+      --text-2: #888888;
+      --accent: #4f9cf9;
+      --accent-2: #8b5cf6;
+      --border: rgba(255,255,255,0.08);
+    }
+    html.theme-light {
+      --bg: #FAFAF9;
+      --surface: #FFFFFF;
+      --surface-2: #f4f4f5;
+      --text: #1a1a1a;
+      --text-2: #666666;
+      --accent: #2563eb;
+      --accent-2: #7c3aed;
+      --border: rgba(0,0,0,0.08);
+    }
+
+    html, body {
+      min-height: 100vh;
+      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── UTILITY MENU (메뉴 버튼 / 더보기 버튼) ── */
+    .menu-container { position: fixed; top: 88px; right: 16px; z-index: 9999; }
+    .menu-toggle {
+      width: 40px; height: 40px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); cursor: pointer; display: flex;
+      align-items: center; justify-content: center; font-size: 18px;
+    }
+    .menu-toggle:hover { background: var(--surface-2); }
+    .menu-dropdown {
+      display: none; position: absolute; top: 48px; right: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px; min-width: 190px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    }
+    .menu-dropdown.open { display: block; }
+    .menu-btn {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 10px 14px; border-radius: 6px; border: none;
+      background: transparent; color: var(--text); font-family: inherit;
+      font-size: 1.05rem; cursor: pointer; text-align: left;
+    }
+    .menu-btn:hover { background: var(--surface-2); }
+
+    /* ── PAGE LAYOUT ── */
+    .page-wrapper {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 28px 16px 40px; gap: 20px;
+    }
+    .page-title {
+      font-size: 1.1rem; color: var(--text-2);
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+
+    /* ── CAROUSEL ── */
+    .carousel-area {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; justify-content: center; flex: 1;
+    }
+    .nav-btn {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) { background: var(--surface-2); transform: scale(1.05); }
+    .nav-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    /* ── MOBILE NAV (버튼을 카드 아래로) ── */
+    .nav-row-mobile {
+      display: none;
+      align-items: center; gap: 16px; justify-content: center;
+    }
+    .nav-row-mobile .nav-btn { width: 48px; height: 48px; font-size: 20px; }
+
+    @media (max-width: 640px) {
+      .carousel-area { gap: 0; }
+      .nav-btn-side { display: none !important; }
+      .nav-row-mobile { display: flex; }
+      .page-wrapper { padding: 20px 8px 36px; gap: 16px; }
+      .hint-text { font-size: 1.0rem; }
+      #dotsRow { display: none !important; }
+      .c-canvas { padding: 40px 40px !important; }
+    }
+
+    /* The clipping frame */
+    #carouselViewport {
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* The scaler — actual 1080×1350, scaled down */
+    #carouselScaler {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 1080px;
+      height: 1350px;
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+    }
+
+    /* ── CARD SLIDES ── */
+    .card-slide {
+      position: absolute; top: 0; left: 0;
+      width: 1080px; height: 1350px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    .card-slide.active { opacity: 1; pointer-events: all; }
+
+    /* Inner card canvas */
+    .c-canvas {
+      width: 1080px; height: 1350px;
+      display: flex; flex-direction: column;
+      padding: 80px 88px;
+      position: relative; overflow: hidden;
+    }
+    .c-bg-circle {
+      position: absolute; border-radius: 50%;
+      pointer-events: none;
+    }
+    .c-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 56px; position: relative; z-index: 1;
+    }
+    .card-slide.active#card-01 .c-header {
+      justify-content: space-between; gap: 20px;
+    }
+    .card-slide.active#card-01 .c-eyebrow,
+    .card-slide.active#card-01 .c-title,
+    .card-slide.active#card-01 .c-msg {
+      text-align: center;
+    }
+
+    /* Card 02-10: 좌측 여백 추가 */
+    .card-slide:not(#card-01) .c-eyebrow,
+    .card-slide:not(#card-01) .c-title,
+    .card-slide:not(#card-01) .c-list li,
+    .card-slide:not(#card-01) .c-msg,
+    .card-slide:not(#card-01) .notif-label,
+    .card-slide:not(#card-01) .notif-items li,
+    .card-slide:not(#card-01) .compare-brand,
+    .card-slide:not(#card-01) .compare-items li,
+    .card-slide:not(#card-01) .compare-badge,
+    .card-slide:not(#card-01) .pill,
+    .card-slide:not(#card-01) .chat-from,
+    .card-slide:not(#card-01) .chat-text,
+    .card-slide:not(#card-01) .data-label,
+    .card-slide:not(#card-01) .data-value {
+      margin-left: 70px;
+    }
+    .c-num { font-size: 26px; font-weight: 300; letter-spacing: 0.08em; color: #FFD700; }
+
+    /* 헤더 아이콘 - 펄스 애니메이션 */
+    .c-header-icon {
+      font-size: 28px;
+      color: #4f9cf9;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.1); }
+    }
+    .c-tag {
+      font-size: 20px; font-weight: 600;
+      letter-spacing: 0.06em; padding: 10px 22px;
+      border-radius: 100px;
+    }
+    .c-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; position: relative; z-index: 1; padding-top: 80px; }
+    .c-eyebrow { font-size: 32px; font-weight: 400; color: #FFFFFF; margin-bottom: 20px; letter-spacing: 0.02em; }
+    .c-title { font-size: 70px; font-weight: 700; line-height: 1.28; letter-spacing: -0.02em; margin-bottom: 44px; }
+    .c-list { list-style: none; display: flex; flex-direction: column; gap: 18px; }
+    .c-list li {
+      font-size: 46px; font-weight: 400; line-height: 1.5;
+      padding-left: 26px; position: relative;
+    }
+    .c-list li::before {
+      content: ''; position: absolute; left: 0;
+      top: 14px; width: 7px; height: 7px;
+      border-radius: 50%; background: currentColor; opacity: 0.8;
+    }
+    .c-bottom { margin-top: auto; position: relative; z-index: 1; }
+    .c-divider { height: 1px; background: currentColor; opacity: 0.3; margin-bottom: 28px; }
+    .c-msg { font-size: 42px; font-weight: 400; line-height: 1.65; }
+    .c-footer { margin-top: 80px; font-size: 24px; color: #FFD700; font-weight: 400; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Notification box */
+    .notif-box { border-radius: 18px; padding: 36px 40px; margin-bottom: 36px; }
+    .notif-label { font-size: 30px; font-weight: 500; margin-bottom: 22px; color: #FFFFFF; }
+    .notif-items { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+    .notif-items li { font-size: 44px; font-weight: 500; display: flex; align-items: center; gap: 14px; }
+    .notif-items li::before { content: '·'; opacity: 1; font-size: 32px; flex-shrink: 0; color: #FFD700; }
+
+    /* Comparison grid */
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: 44px; }
+    .compare-col { border-radius: 18px; padding: 38px 34px; }
+    .compare-brand { font-size: 36px; font-weight: 700; margin-bottom: 28px; }
+    .compare-items { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .compare-items li { font-size: 42px; font-weight: 400; color: #FFFFFF; }
+    .compare-badge { margin-top: 28px; font-size: 30px; font-weight: 700; }
+
+    /* Tag pills */
+    .pill-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 48px; }
+    .pill { border-radius: 12px; padding: 18px 28px; font-size: 44px; font-weight: 600; }
+
+    /* Chat bubbles */
+    .chat-list { display: flex; flex-direction: column; gap: 22px; }
+    .chat-item { border-radius: 14px; padding: 28px 32px; }
+    .chat-from { font-size: 28px; font-weight: 500; margin-bottom: 10px; color: #FFFFFF; }
+    .chat-text { font-size: 44px; font-weight: 400; line-height: 1.5; }
+
+    /* Data grid */
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 36px; }
+    .data-cell { border-radius: 14px; padding: 32px; }
+    .data-label { font-size: 26px; margin-bottom: 12px; color: #FFD700; }
+    .data-value { font-size: 42px; font-weight: 600; line-height: 1.45; }
+
+    /* ── DOTS ── */
+    .dots-row { display: flex; gap: 7px; justify-content: center; }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--border); cursor: pointer;
+      transition: all 0.25s;
+    }
+    .dot.active { background: var(--accent); width: 22px; border-radius: 4px; }
+
+    /* ── ACTION BUTTONS ── */
+    .action-row { display: none; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .action-btn {
+      padding: 12px 26px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); font-family: inherit; font-size: 1.05rem;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .action-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+    .action-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .action-btn.primary:hover { opacity: 0.85; }
+
+    .hint-text { font-size: 1.05rem; color: #FFFFFF; text-align: center; }
+
+    /* ── SKIP LINK ── */
+    .skip-link {
+      position: absolute; top: -40px; left: 16px; background: var(--accent);
+      color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; z-index: 9999;
+    }
+    .skip-link:focus { top: 16px; }
+
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .animate { animation: fadeInUp 0.5s ease both; }
+
+    @media print { .menu-container, .nav-btn, .dots-row, .action-row, .hint-text { display: none !important; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+  </style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">본문으로 이동</a>
+
+<!-- Utility Menu -->
+<div class="menu-container">
+  <button class="menu-toggle" onclick="toggleMenu()" aria-label="메뉴">⋯</button>
+  <div class="menu-dropdown" id="menuDropdown">
+    <button class="menu-btn" onclick="cycleTheme()"><span>◐</span> 테마 변경</button>
+    <button class="menu-btn" onclick="window.print()"><span>⎙</span> 인쇄 / PDF</button>
+  </div>
+</div>
+
+<main id="main-content">
+<div class="page-wrapper">
+
+  <div class="page-title animate">Google Daily Brief · 한국 현실 검증</div>
+
+  <div class="carousel-area">
+    <button class="nav-btn nav-btn-side" id="prevBtn" onclick="prevCard()" disabled aria-label="이전">←</button>
+
+    <!-- Clipping viewport -->
+    <div id="carouselViewport">
+      <!-- Scaler: always 1080×1350, scaled by JS -->
+      <div id="carouselScaler">
+
+        <!-- ════════════════════════════════════
+             CARD 01 · 표지
+        ════════════════════════════════════ -->
+        <div class="card-slide active" id="card-01">
+          <div class="c-canvas" style="background:#0d1117; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:700px;height:700px;background:radial-gradient(circle,rgba(79,156,249,0.13) 0%,transparent 70%);top:-250px;right:-250px;"></div>
+            <div class="c-bg-circle" style="width:450px;height:450px;background:radial-gradient(circle,rgba(139,92,246,0.09) 0%,transparent 70%);bottom:50px;left:-180px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(79,156,249,0.15);color:#4f9cf9;">한국 현실 검증</div>
+              <div class="c-header-icon">✨</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-eyebrow">Google I/O 2026 발표 이후</div>
+              <div class="c-title">발표를 보고<br>가장 먼저 든 생각</div>
+              <div style="background:rgba(79,156,249,0.1);border:1px solid rgba(79,156,249,0.22);border-radius:22px;padding:50px 54px;text-align:center;">
+                <div style="font-size:46px;font-weight:400;line-height:1.7;color:#ccdeff;">
+                  "Google Daily Brief, 한국에서는<br>
+                  <span style="color:#4f9cf9;font-weight:700;">Gmail보다<br>카카오톡이 먼저</span><br>
+                  아닐까?"
+                </div>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">좋아 보였지만,<br>한국에서는 다른 질문이 먼저 떠올랐습니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">01 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 02 · 구독 결제 관리
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-02">
+          <div class="c-canvas" style="background:#0f0f1a; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:550px;height:550px;background:radial-gradient(circle,rgba(251,191,36,0.09) 0%,transparent 70%);top:-150px;right:-150px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(251,191,36,0.15);color:#fbbf24;">결제 관리</div>
+              <div class="c-header-icon">💳</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-eyebrow">캘린더에 적어두는 것들</div>
+              <div class="c-title" style="font-size:50px;margin-bottom:46px;">
+                놓치면<br>그냥 결제가 됩니다
+              </div>
+              <ul class="c-list">
+                <li>GPT · Claude · Gemini&nbsp;<span style="color:#fbbf24;font-weight:700;">갱신일</span></li>
+                <li><span style="color:#fbbf24;font-weight:700;">무료체험 종료</span>일</li>
+                <li>다음달 취소 예정일</li>
+                <li>D-1 <span style="color:#fbbf24;font-weight:700;">알람</span> 설정</li>
+              </ul>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">놓치면 정보가 아니라,<br><span style="color:#fbbf24;font-weight:700;">돈이 빠져나갑니다.</span></div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">02 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 03 · 이메일 현실
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-03">
+          <div class="c-canvas" style="background:#0d1117; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:480px;height:480px;background:radial-gradient(circle,rgba(16,185,129,0.09) 0%,transparent 70%);top:-80px;right:-80px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(16,185,129,0.15);color:#34d399;">이메일 현실</div>
+              <div class="c-header-icon">📧</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-eyebrow">이메일은 분명 사용합니다</div>
+              <ul class="c-list" style="margin-bottom:44px;">
+                <li>결제 안내 · 구독 갱신</li>
+                <li>예약 메일 · 영수증</li>
+              </ul>
+              <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:40px;margin-left:70px;">
+                <div style="font-size:36px;font-weight:300;color:#FFFFFF;margin-bottom:18px;">하지만.</div>
+                <div style="font-size:52px;font-weight:700;line-height:1.42;">
+                  카톡처럼 <span style="color:#34d399;">수시로</span><br>열어보는 공간은<br>아닙니다.
+                </div>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">이 지점에서<br>Daily Brief가 조금 다르게 보였습니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">03 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 04 · Daily Brief 체감
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-04">
+          <div class="c-canvas" style="background:#0d1117; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:500px;height:500px;background:radial-gradient(circle,rgba(79,156,249,0.11) 0%,transparent 70%);bottom:-80px;right:-80px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(79,156,249,0.15);color:#4f9cf9;">Daily Brief</div>
+              <div class="c-header-icon">📋</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-title" style="font-size:47px;margin-bottom:50px;">
+                AI가 내가 잘<br>열어보지 않는 이메일을<br>먼저 읽어준다면?
+              </div>
+              <div class="notif-box" style="background:rgba(79,156,249,0.1);border:1px solid rgba(79,156,249,0.22);">
+                <div class="notif-label">📋 오늘 확인 필요</div>
+                <ul class="notif-items">
+                  <li>GPT · Claude · Gemini&nbsp;<span style="color:#4f9cf9;font-weight:700;">갱신 D-1</span></li>
+                  <li>쿠팡 / 네이버멤버십&nbsp;<span style="color:#4f9cf9;font-weight:700;">결제 예정</span></li>
+                  <li><span style="color:#fbbf24;font-weight:700;">무료체험 종료</span>&nbsp;예정</li>
+                  <li>최근 사용빈도 낮음</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">"오… 이건 조금 괜찮은데?"<br>싶었습니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">04 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 05 · AI 비교
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-05">
+          <div class="c-canvas" style="background:#0d1117; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:400px;height:400px;background:radial-gradient(circle,rgba(139,92,246,0.1) 0%,transparent 70%);top:-60px;left:-60px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(139,92,246,0.15);color:#a78bfa;">AI 비교</div>
+              <div class="c-header-icon">🤖</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-eyebrow" style="margin-bottom:36px;">차이는 여기 있습니다</div>
+              <div class="compare-grid">
+                <div class="compare-col" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);">
+                  <div class="compare-brand" style="color:#FFFFFF;">ChatGPT · Claude</div>
+                  <ul class="compare-items" style="color:#FFFFFF;">
+                    <li>내가 질문</li>
+                    <li>내가 설정</li>
+                    <li>내가 연결</li>
+                  </ul>
+                  <div class="compare-badge" style="color:#FFD700;">내가 호출</div>
+                </div>
+                <div class="compare-col" style="background:rgba(79,156,249,0.1);border:1px solid rgba(79,156,249,0.28);">
+                  <div class="compare-brand" style="color:#4f9cf9;">Gemini Daily Brief</div>
+                  <ul class="compare-items">
+                    <li>먼저 정리</li>
+                    <li>먼저 감지</li>
+                    <li>먼저 브리핑</li>
+                  </ul>
+                  <div class="compare-badge" style="color:#4f9cf9;">AI가 호출</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">차이는 AI 성능보다,<br><span style="color:#4f9cf9;font-weight:700;">시작점</span>에 있습니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">05 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 06 · 체감되는 사람들
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-06">
+          <div class="c-canvas" style="background:#0f0a1e; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:650px;height:650px;background:radial-gradient(circle,rgba(139,92,246,0.1) 0%,transparent 70%);top:-220px;right:-220px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(139,92,246,0.15);color:#a78bfa;">대상</div>
+              <div class="c-header-icon">👥</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-eyebrow">체감될 수 있는 사람들</div>
+              <div class="pill-grid">
+                <div class="pill" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);">프리랜서</div>
+                <div class="pill" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);">강사</div>
+                <div class="pill" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);">학원 원장</div>
+                <div class="pill" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);">이미용샵 운영자</div>
+                <div class="pill" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);">골프장 운영</div>
+                <div class="pill" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);">1인 사업자</div>
+              </div>
+              <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:38px;margin-left:70px;">
+                <div style="font-size:26px;color:#FFFFFF;margin-bottom:16px;">공통점은 하나</div>
+                <div style="font-size:54px;font-weight:700;line-height:1.38;">
+                  누가 대신 체크해주는<br>사람이 없습니다.
+                </div>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg"><span style="color:#a78bfa;font-weight:700;">혼자 관리</span>하는 사람에게<br>놓침은 곧 리스크가 됩니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">06 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 07 · 위기 예방
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-07">
+          <div class="c-canvas" style="background:#100a0a; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:550px;height:550px;background:radial-gradient(circle,rgba(244,63,94,0.11) 0%,transparent 70%);top:-150px;right:-150px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(244,63,94,0.15);color:#fb7185;">위기 예방</div>
+              <div class="c-header-icon">⚠️</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-eyebrow">밤 늦게 도착한 것들</div>
+              <div class="c-title" style="font-size:46px;margin-bottom:46px;">
+                문제는 몰랐던 게 아닙니다.<br>
+                <span style="color:#fb7185;">늦게 발견</span>한 것입니다.
+              </div>
+              <ul class="c-list">
+                <li>수정 요청</li>
+                <li>예약 변경 및 취소</li>
+                <li>일정 조정 · 회신 대기 메일</li>
+                <li>다음날 오전 마감</li>
+              </ul>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">아침에 먼저 알았다면<br>결과가 달라졌을 수 있습니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">07 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 08 · 한국 데이터 위치
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-08">
+          <div class="c-canvas" style="background:#0a1018; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:600px;height:600px;background:radial-gradient(circle,rgba(20,184,166,0.08) 0%,transparent 70%);bottom:-200px;left:-200px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(20,184,166,0.15);color:#2dd4bf;">데이터 위치</div>
+              <div class="c-header-icon">📍</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-title" style="font-size:50px;margin-bottom:50px;">
+                한국의 데이터는<br>한곳에 있지 않습니다
+              </div>
+              <div class="data-grid">
+                <div class="data-cell" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
+                  <div class="data-label">개인 메일</div>
+                  <div class="data-value">네이버 메일<br><span style="opacity:0.5">+</span> Gmail</div>
+                </div>
+                <div class="data-cell" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
+                  <div class="data-label">업무 메일</div>
+                  <div class="data-value">그룹웨어<br><span style="opacity:0.5">·</span> 인트라넷</div>
+                </div>
+                <div class="data-cell" style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.22);grid-column:span 2;">
+                  <div class="data-label" style="color:#2dd4bf;">실제 소통</div>
+                  <div class="data-value" style="font-size:42px;">카카오톡 · 오픈채팅</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">Google이 읽을 수 있는 데이터는<br><span style="color:#2dd4bf;font-weight:700;">내 하루의 일부</span>일 수 있습니다.</div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">08 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 09 · 카카오톡 구조적 한계
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-09">
+          <div class="c-canvas" style="background:#0d1117; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:400px;height:400px;background:radial-gradient(circle,rgba(251,191,36,0.08) 0%,transparent 70%);bottom:-100px;right:-100px;"></div>
+
+            <div class="c-header">
+              <div class="c-tag" style="background:rgba(251,191,36,0.15);color:#fbbf24;">구조적 한계</div>
+              <div class="c-header-icon">💬</div>
+            </div>
+
+            <div class="c-body">
+              <div class="c-title" style="font-size:46px;margin-bottom:48px;">
+                한국에서는 일정이<br>
+                <span style="color:#fbbf24;">메시지 앱</span>에서<br>먼저 바뀝니다
+              </div>
+              <div class="chat-list">
+                <div class="chat-item" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
+                  <div class="chat-from">1:1 메시지</div>
+                  <div class="chat-text">"내일 2시를 1시로 당길 수 있을까요?"</div>
+                </div>
+                <div class="chat-item" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
+                  <div class="chat-from">단체 채팅방</div>
+                  <div class="chat-text">"수정 자료 다시 올릴께요."</div>
+                </div>
+                <div class="chat-item" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.22);">
+                  <div class="chat-from" style="color:#fbbf24;">오픈채팅</div>
+                  <div class="chat-text">"일정 변경 공지드립니다."</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="c-bottom">
+              <div class="c-divider"></div>
+              <div class="c-msg">메일도 없고, 캘린더 업데이트도 없지만<br><span style="color:#fbbf24;font-weight:700;">실제 일정은 바뀌었습니다.</span></div>
+              <div class="c-footer"><span>@SEINTU_AI</span><span class="c-num">09 / 10</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             CARD 10 · 최종 판정
+        ════════════════════════════════════ -->
+        <div class="card-slide" id="card-10">
+          <div class="c-canvas" style="background:#04060a; color:#f0f0f0;">
+            <div class="c-bg-circle" style="width:750px;height:750px;background:radial-gradient(circle,rgba(79,156,249,0.13) 0%,transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+
+            <div class="c-header">
+              <div class="c-num">10 / 10</div>
+              <div class="c-tag" style="background:rgba(79,156,249,0.15);color:#4f9cf9;">최종 판정</div>
+              <div class="c-header-icon">🎯</div>
+            </div>
+
+            <div class="c-body" style="justify-content:center;align-items:center;text-align:center;position:relative;z-index:1;">
+              <div style="font-size:32px;color:#FFFFFF;margin-bottom:24px;font-weight:300;">Google Daily Brief의 힘은</div>
+              <div style="font-size:32px;color:#FFFFFF;margin-bottom:32px;font-weight:300;">AI가 얼마나 똑똑한가보다</div>
+              <div style="font-size:52px;font-weight:700;line-height:1.38;color:#f0f0f0;margin-bottom:52px;">
+                <span style="color:#4f9cf9;">내 하루의 데이터</span>가<br>어디에 기록되어<br>있는가에 달려 있습니다.
+              </div>
+              <div style="width:56px;height:2px;background:rgba(79,156,249,0.6);margin:0 auto;border-radius:1px;"></div>
+            </div>
+
+            <div class="c-bottom" style="position:relative;z-index:1;">
+              <div class="c-divider"></div>
+              <div class="c-msg" style="font-size:32px;">AI가 내 하루를 읽으려면,<br>먼저 내 하루가 어디에 기록되는지 알아야 합니다.</div>
+              <div class="c-footer">@SEINTU_AI</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /carouselScaler -->
+    </div><!-- /carouselViewport -->
+
+    <button class="nav-btn nav-btn-side" id="nextBtn" onclick="nextCard()" aria-label="다음">→</button>
+  </div><!-- /carousel-area -->
+
+  <!-- 모바일 전용 네비게이션 -->
+  <div class="nav-row-mobile">
+    <button class="nav-btn" id="prevBtnMobile" onclick="prevCard()" disabled aria-label="이전">←</button>
+    <div class="dots-row" id="dotsRowMobile" style="display:flex;gap:7px;"></div>
+    <button class="nav-btn" id="nextBtnMobile" onclick="nextCard()" aria-label="다음">→</button>
+  </div>
+
+  <div class="dots-row" id="dotsRow"></div>
+
+  <div class="hint-text">← → 키보드 방향키 · 스와이프로도 이동 가능합니다</div>
+
+</div><!-- /page-wrapper -->
+</main>
+
+<script>
+  /* ── THEME ── */
+  var themes = ['dark','light'];
+  var currentTheme = 0;
+
+  function cycleTheme() {
+    currentTheme = (currentTheme + 1) % themes.length;
+    var t = themes[currentTheme];
+    document.documentElement.className = 'theme-' + t;
+    try { localStorage.setItem('theme', t); } catch(e) {}
+  }
+  try {
+    var saved = localStorage.getItem('theme');
+    if (saved && themes.indexOf(saved) !== -1) {
+      currentTheme = themes.indexOf(saved);
+      document.documentElement.className = 'theme-' + saved;
+    }
+  } catch(e) {}
+
+  /* ── MENU ── */
+  function toggleMenu() {
+    document.getElementById('menuDropdown').classList.toggle('open');
+  }
+  document.addEventListener('click', function(e) {
+    var c = document.querySelector('.menu-container');
+    if (c && !c.contains(e.target)) document.getElementById('menuDropdown').classList.remove('open');
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.getElementById('menuDropdown').classList.remove('open');
+    if (e.key === 'ArrowRight') nextCard();
+    if (e.key === 'ArrowLeft') prevCard();
+  });
+
+  /* ── CAROUSEL ── */
+  var TOTAL = 10;
+  var current = 0;
+  var cardScale = 1;
+
+  function computeScale() {
+    var isMobile = window.innerWidth <= 640;
+    /* 모바일: 사이드 버튼 없으므로 좌우 패딩만 제외 */
+    /* 데스크탑: 양쪽 네비 버튼(44px) + gap(14px) × 2 = 116px 확보 */
+    var sidePad = isMobile ? 24 : 116;
+    var maxW = window.innerWidth - sidePad;
+    var maxH = window.innerHeight * (isMobile ? 0.65 : 0.76);
+    cardScale = Math.min(maxW / 1080, maxH / 1350, 1);
+    var vw = Math.round(1080 * cardScale);
+    var vh = Math.round(1350 * cardScale);
+    var vp = document.getElementById('carouselViewport');
+    vp.style.width  = vw + 'px';
+    vp.style.height = vh + 'px';
+    document.getElementById('carouselScaler').style.transform = 'translate(-50%, -50%) scale(' + cardScale + ')';
+  }
+
+  function updateUI() {
+    var isFirst = current === 0;
+    var isLast  = current === TOTAL - 1;
+    /* 데스크탑 사이드 버튼 */
+    var pb = document.getElementById('prevBtn');
+    var nb = document.getElementById('nextBtn');
+    if (pb) pb.disabled = isFirst;
+    if (nb) nb.disabled = isLast;
+    /* 모바일 버튼 */
+    var pbm = document.getElementById('prevBtnMobile');
+    var nbm = document.getElementById('nextBtnMobile');
+    if (pbm) pbm.disabled = isFirst;
+    if (nbm) nbm.disabled = isLast;
+    /* 점 네비 (데스크탑 + 모바일 공통) */
+    document.querySelectorAll('.dot').forEach(function(d, i) {
+      d.classList.toggle('active', i === current);
+    });
+    /* 카드 표시 */
+    document.querySelectorAll('.card-slide').forEach(function(el, i) {
+      el.classList.toggle('active', i === current);
+    });
+  }
+
+  function prevCard() { if (current > 0) { current--; updateUI(); } }
+  function nextCard() { if (current < TOTAL - 1) { current++; updateUI(); } }
+
+  /* Build dots (데스크탑 + 모바일 양쪽에 생성) */
+  function buildDots(containerId) {
+    var row = document.getElementById(containerId);
+    if (!row) return;
+    row.innerHTML = '';
+    for (var di = 0; di < TOTAL; di++) {
+      (function(idx) {
+        var dot = document.createElement('div');
+        dot.className = 'dot' + (idx === 0 ? ' active' : '');
+        dot.onclick = function() { current = idx; updateUI(); };
+        row.appendChild(dot);
+      })(di);
+    }
+  }
+  buildDots('dotsRow');
+  buildDots('dotsRowMobile');
+
+  computeScale();
+  window.addEventListener('resize', function() { computeScale(); });
+
+  /* Touch / swipe */
+  var touchX0 = 0;
+  document.addEventListener('touchstart', function(e) { touchX0 = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchX0;
+    if (dx < -50) nextCard();
+    if (dx > 50) prevCard();
+  }, {passive:true});
+</script>
+</body>
+</html>
